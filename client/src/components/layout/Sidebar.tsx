@@ -66,21 +66,19 @@ export default function Sidebar() {
               
               return (
                 <li key={item.id}>
-                  <Link href={item.path}>
-                    <a className={cn(
-                      "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                      isActive
-                        ? "text-primary bg-primary/10 dark:bg-primary/20"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
-                    )}>
-                      <Icon className={cn(
-                        "mr-3 h-5 w-5",
-                        isActive 
-                          ? "text-primary" 
-                          : "text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300"
-                      )} />
-                      {item.name}
-                    </a>
+                  <Link href={item.path} className={cn(
+                    "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                    isActive
+                      ? "text-primary bg-primary/10 dark:bg-primary/20"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
+                  )}>
+                    <Icon className={cn(
+                      "mr-3 h-5 w-5",
+                      isActive 
+                        ? "text-primary" 
+                        : "text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300"
+                    )} />
+                    {item.name}
                   </Link>
                 </li>
               );
