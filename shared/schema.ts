@@ -1,29 +1,29 @@
-import { pgTable, text, serial, integer, decimal, timestamp, boolean } from "drizzle-orm/pg-core";
+import { mysqlTable, varchar, int, decimal, timestamp } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const customers = pgTable("customers", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  phone: text("phone"),
-  address: text("address"),
+export const customers = mysqlTable("customers", {
+  id: int("id").primaryKey().autoincrement(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  phone: varchar("phone", { length: 50 }),
+  address: varchar("address", { length: 500 }),
 });
 
-export const products = pgTable("products", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  category: text("category").notNull(),
+export const products = mysqlTable("products", {
+  id: int("id").primaryKey().autoincrement(),
+  name: varchar("name", { length: 255 }).notNull(),
+  category: varchar("category", { length: 100 }).notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  stock: integer("stock").notNull().default(0),
-  status: text("status").notNull().default("In Stock"),
+  stock: int("stock").notNull().default(0),
+  status: varchar("status", { length: 50 }).notNull().default("In Stock"),
 });
 
-export const sales = pgTable("sales", {
-  id: serial("id").primaryKey(),
-  productId: integer("product_id").notNull(),
-  customerId: integer("customer_id").notNull(),
-  quantity: integer("quantity").notNull(),
+export const sales = mysqlTable("sales", {
+  id: int("id").primaryKey().autoincrement(),
+  productId: int("product_id").notNull(),
+  customerId: int("customer_id").notNull(),
+  quantity: int("quantity").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   date: timestamp("date").notNull().defaultNow(),

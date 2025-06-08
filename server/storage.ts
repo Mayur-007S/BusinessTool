@@ -11,6 +11,9 @@ import {
   type SaleWithDetails,
   type DashboardStats
 } from "@shared/schema";
+import { drizzle } from "drizzle-orm/mysql2";
+import { eq, gte, lte, sql } from "drizzle-orm";
+import mysql from "mysql2/promise";
 
 export interface IStorage {
   // Customers
@@ -248,4 +251,299 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// MySQL Storage Implementation
+export class MySQLStorage implements IStorage {
+  private db: any;
+
+  constructor() {
+    this.initializeDatabase();
+  }
+
+  private async initializeDatabase() {
+    try {
+      // Create MySQL connection
+      const connection = await mysql.createConnection({
+        host: process.env.MYSQL_HOST || "localhost",
+        port: parseInt(process.env.MYSQL_PORT || "3306"),
+        user: process.env.MYSQL_USER || "root",
+        password: process.env.MYSQL_PASSWORD || "",
+        database: process.env.MYSQL_DATABASE || "businessanalysisdb",
+      });
+
+      this.db = drizzle(connection);
+      
+      // Create tables if they don't exist
+      await this.createTables();
+      await this.seedInitialData();
+      
+      console.log("✅ MySQL database connected and initialized");
+    } catch (error) {
+      console.error("❌ MySQL connection failed:", error);
+      console.log("Falling back to in-memory storage");
+      // Fall back to in-memory storage if MySQL fails
+      return;
+    }
+  }
+
+  private async createTables() {
+    try {
+      // Create customers table
+      await this.db.execute(sql`
+        CREATE TABLE IF NOT EXISTS customers (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          email VARCHAR(255) NOT NULL UNIQUE,
+          phone VARCHAR(50),
+          address VARCHAR(500)
+        )
+      `);
+
+      // Create products table
+      await this.db.execute(sql`
+        CREATE TABLE IF NOT EXISTS products (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          category VARCHAR(100) NOT NULL,
+          price DECIMAL(10, 2) NOT NULL,
+          stock INT NOT NULL DEFAULT 0,
+          status VARCHAR(50) NOT NULL DEFAULT 'In Stock'
+        )
+      `);
+
+      // Create sales table
+      await this.db.execute(sql`
+        CREATE TABLE IF NOT EXISTS sales (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          product_id INT NOT NULL,
+          customer_id INT NOT NULL,
+          quantity INT NOT NULL,
+          price DECIMAL(10, 2) NOT NULL,
+          total DECIMAL(10, 2) NOT NULL,
+          date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (product_id) REFERENCES products(id),
+          FOREIGN KEY (customer_id) REFERENCES customers(id)
+        )
+      `);
+    } catch (error) {
+      console.error("Error creating tables:", error);
+    }
+  }
+
+  private async seedInitialData() {
+    try {
+      // Check if data already exists
+      const existingCustomers = await this.db.select().from(customers).limit(1);
+      if (existingCustomers.length > 0) return;
+
+      // Insert sample customers
+      await this.db.insert(customers).values([
+        { name: "John Smith", email: "john@example.com", phone: "(555) 123-4567", address: "123 Main St, Anytown, USA" },
+        { name: "Sarah Johnson", email: "sarah@example.com", phone: "(555) 987-6543", address: "456 Oak Ave, Somewhere, USA" },
+        { name: "Mike Wilson", email: "mike@example.com", phone: "(555) 555-0123", address: "789 Pine Rd, Elsewhere, USA" },
+      ]);
+
+      // Insert sample products
+      await this.db.insert(products).values([
+        { name: "Premium Software License", category: "Software", price: "299.99", stock: 50, status: "In Stock" },
+        { name: "Professional Consultation", category: "Services", price: "150.00", stock: 100, status: "Available" },
+        { name: "Hardware Kit", category: "Hardware", price: "89.95", stock: 25, status: "In Stock" },
+        { name: "Training Package", category: "Education", price: "199.99", stock: 30, status: "Available" },
+      ]);
+
+      // Insert sample sales
+      await this.db.insert(sales).values([
+        { productId: 1, customerId: 1, quantity: 2, price: "299.99", total: "599.98" },
+        { productId: 2, customerId: 2, quantity: 1, price: "150.00", total: "150.00" },
+        { productId: 3, customerId: 3, quantity: 3, price: "89.95", total: "269.85" },
+        { productId: 4, customerId: 1, quantity: 1, price: "199.99", total: "199.99" },
+        { productId: 1, customerId: 2, quantity: 1, price: "299.99", total: "299.99" },
+        { productId: 2, customerId: 3, quantity: 2, price: "150.00", total: "300.00" },
+      ]);
+
+      console.log("✅ Sample data inserted into MySQL database");
+    } catch (error) {
+      console.error("Error seeding data:", error);
+    }
+  }
+
+  // Customer methods
+  async getCustomers(): Promise<Customer[]> {
+    if (!this.db) return [];
+    return await this.db.select().from(customers);
+  }
+
+  async getCustomer(id: number): Promise<Customer | undefined> {
+    if (!this.db) return undefined;
+    const result = await this.db.select().from(customers).where(eq(customers.id, id));
+    return result[0];
+  }
+
+  async createCustomer(customer: InsertCustomer): Promise<Customer> {
+    if (!this.db) throw new Error("Database not available");
+    const result = await this.db.insert(customers).values(customer);
+    const newCustomer = await this.getCustomer(result[0].insertId);
+    return newCustomer!;
+  }
+
+  async updateCustomer(id: number, customer: Partial<InsertCustomer>): Promise<Customer | undefined> {
+    if (!this.db) return undefined;
+    await this.db.update(customers).set(customer).where(eq(customers.id, id));
+    return await this.getCustomer(id);
+  }
+
+  async deleteCustomer(id: number): Promise<boolean> {
+    if (!this.db) return false;
+    const result = await this.db.delete(customers).where(eq(customers.id, id));
+    return result.affectedRows > 0;
+  }
+
+  // Product methods
+  async getProducts(): Promise<Product[]> {
+    if (!this.db) return [];
+    return await this.db.select().from(products);
+  }
+
+  async getProduct(id: number): Promise<Product | undefined> {
+    if (!this.db) return undefined;
+    const result = await this.db.select().from(products).where(eq(products.id, id));
+    return result[0];
+  }
+
+  async createProduct(product: InsertProduct): Promise<Product> {
+    if (!this.db) throw new Error("Database not available");
+    const result = await this.db.insert(products).values(product);
+    const newProduct = await this.getProduct(result[0].insertId);
+    return newProduct!;
+  }
+
+  async updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined> {
+    if (!this.db) return undefined;
+    await this.db.update(products).set(product).where(eq(products.id, id));
+    return await this.getProduct(id);
+  }
+
+  async deleteProduct(id: number): Promise<boolean> {
+    if (!this.db) return false;
+    const result = await this.db.delete(products).where(eq(products.id, id));
+    return result.affectedRows > 0;
+  }
+
+  // Sales methods
+  async getSales(): Promise<SaleWithDetails[]> {
+    if (!this.db) return [];
+    const result = await this.db
+      .select({
+        id: sales.id,
+        productId: sales.productId,
+        customerId: sales.customerId,
+        quantity: sales.quantity,
+        price: sales.price,
+        total: sales.total,
+        date: sales.date,
+        productName: products.name,
+        customerName: customers.name,
+      })
+      .from(sales)
+      .leftJoin(products, eq(sales.productId, products.id))
+      .leftJoin(customers, eq(sales.customerId, customers.id));
+    
+    return result;
+  }
+
+  async getSale(id: number): Promise<SaleWithDetails | undefined> {
+    if (!this.db) return undefined;
+    const result = await this.db
+      .select({
+        id: sales.id,
+        productId: sales.productId,
+        customerId: sales.customerId,
+        quantity: sales.quantity,
+        price: sales.price,
+        total: sales.total,
+        date: sales.date,
+        productName: products.name,
+        customerName: customers.name,
+      })
+      .from(sales)
+      .leftJoin(products, eq(sales.productId, products.id))
+      .leftJoin(customers, eq(sales.customerId, customers.id))
+      .where(eq(sales.id, id));
+    
+    return result[0];
+  }
+
+  async createSale(sale: InsertSale): Promise<Sale> {
+    if (!this.db) throw new Error("Database not available");
+    const result = await this.db.insert(sales).values(sale);
+    const newSale = await this.db.select().from(sales).where(eq(sales.id, result[0].insertId));
+    return newSale[0];
+  }
+
+  async deleteSale(id: number): Promise<boolean> {
+    if (!this.db) return false;
+    const result = await this.db.delete(sales).where(eq(sales.id, id));
+    return result.affectedRows > 0;
+  }
+
+  // Dashboard methods
+  async getDashboardStats(dateRange?: { start: Date; end: Date }): Promise<DashboardStats> {
+    if (!this.db) {
+      return {
+        totalRevenue: "$0.00",
+        activeCustomers: 0,
+        salesThisMonth: 0,
+        inventoryItems: 0
+      };
+    }
+
+    let salesQuery = this.db.select().from(sales);
+    
+    if (dateRange) {
+      salesQuery = salesQuery.where(
+        sql`${sales.date} >= ${dateRange.start} AND ${sales.date} <= ${dateRange.end}`
+      );
+    }
+
+    const salesData = await salesQuery;
+    const totalRevenue = salesData.reduce((sum, sale) => sum + parseFloat(sale.total), 0);
+    
+    const customersData = await this.db.select().from(customers);
+    const productsData = await this.db.select().from(products);
+    const inventoryItems = productsData.reduce((sum, product) => sum + product.stock, 0);
+
+    return {
+      totalRevenue: `$${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      activeCustomers: customersData.length,
+      salesThisMonth: salesData.length,
+      inventoryItems: inventoryItems
+    };
+  }
+
+  async getSalesInDateRange(dateRange: { start: Date; end: Date }): Promise<SaleWithDetails[]> {
+    if (!this.db) return [];
+    
+    const result = await this.db
+      .select({
+        id: sales.id,
+        productId: sales.productId,
+        customerId: sales.customerId,
+        quantity: sales.quantity,
+        price: sales.price,
+        total: sales.total,
+        date: sales.date,
+        productName: products.name,
+        customerName: customers.name,
+      })
+      .from(sales)
+      .leftJoin(products, eq(sales.productId, products.id))
+      .leftJoin(customers, eq(sales.customerId, customers.id))
+      .where(
+        sql`${sales.date} >= ${dateRange.start} AND ${sales.date} <= ${dateRange.end}`
+      );
+    
+    return result;
+  }
+}
+
+// Choose storage implementation based on environment
+export const storage = process.env.USE_MYSQL === 'true' ? new MySQLStorage() : new MemStorage();
