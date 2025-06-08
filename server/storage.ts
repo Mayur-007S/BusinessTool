@@ -505,11 +505,11 @@ export class MySQLStorage implements IStorage {
     }
 
     const salesData = await salesQuery;
-    const totalRevenue = salesData.reduce((sum, sale) => sum + parseFloat(sale.total), 0);
+    const totalRevenue = salesData.reduce((sum: number, sale: any) => sum + parseFloat(sale.total), 0);
     
     const customersData = await this.db.select().from(customers);
     const productsData = await this.db.select().from(products);
-    const inventoryItems = productsData.reduce((sum, product) => sum + product.stock, 0);
+    const inventoryItems = productsData.reduce((sum: number, product: any) => sum + product.stock, 0);
 
     return {
       totalRevenue: `$${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
