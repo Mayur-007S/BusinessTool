@@ -9,8 +9,8 @@ if ! command -v mvn &> /dev/null; then
     apt update && apt install -y maven
 fi
 
-# Set Java environment
-export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+# Set Java environment for Nix
+export JAVA_HOME=$(dirname $(dirname $(which java)))
 export PATH=$JAVA_HOME/bin:$PATH
 
 echo "MySQL Database Configuration:"
