@@ -36,25 +36,25 @@ public class AppConfig implements WebMvcConfigurer {
     public DataSource dataSource() {
         HikariConfig config = new HikariConfig();
         
-        String databaseUrl = System.getenv("DATABASE_URL");
-        if (databaseUrl != null) {
-            config.setJdbcUrl(databaseUrl);
-        } else {
-            config.setJdbcUrl(String.format("jdbc:postgresql://%s:%s/%s",
-                System.getenv("PGHOST"),
-                System.getenv("PGPORT"),
-                System.getenv("PGDATABASE")));
-        }
+        // MySQL database configuration
+        config.setJdbcUrl("jdbc:mysql://localhost:3306/businessanaysisdb");
+        config.setUsername(env.getProperty("mysql.username", "root"));
+        config.setPassword(env.getProperty("mysql.password", ""));
+        config.setDriverClassName("com.mysql.cj.jdbc.Driver");
         
-        config.setUsername(System.getenv("PGUSER"));
-        config.setPassword(System.getenv("PGPASSWORD"));
-        config.setDriverClassName("org.postgresql.Driver");
-        
+        // Connection pool settings optimized for MySQL
         config.setMaximumPoolSize(10);
         config.setMinimumIdle(2);
         config.setConnectionTimeout(30000);
         config.setIdleTimeout(600000);
         config.setMaxLifetime(1800000);
+        
+        // MySQL specific connection properties
+        config.addDataSourceProperty("useUnicode", "true");
+        config.addDataSourceProperty("characterEncoding", "UTF-8");
+        config.addDataSourceProperty("useSSL", "false");
+        config.addDataSourceProperty("allowPublicKeyRetrieval", "true");
+        config.addDataSourceProperty("serverTimezone", "UTC");
         
         return new HikariDataSource(config);
     }
@@ -77,13 +77,16 @@ public class AppConfig implements WebMvcConfigurer {
 
     private Properties hibernateProperties() {
         Properties properties = new Properties();
-        properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
+        properties.put("hibernate.dialect", "org.hibernate.dialect.MySQL8Dialect");
         properties.put("hibernate.hbm2ddl.auto", "update");
         properties.put("hibernate.show_sql", "true");
         properties.put("hibernate.format_sql", "true");
-        properties.put("hibernate.connection.CharSet", "utf8");
+        properties.put("hibernate.connection.CharSet", "utf8mb4");
         properties.put("hibernate.connection.characterEncoding", "utf8");
         properties.put("hibernate.connection.useUnicode", "true");
+        properties.put("hibernate.connection.autoReconnect", "true");
+        properties.put("hibernate.connection.failOverReadOnly", "false");
+        properties.put("hibernate.connection.maxReconnects", "10");
         return properties;
     }
 
