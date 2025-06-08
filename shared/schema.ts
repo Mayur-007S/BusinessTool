@@ -32,6 +32,9 @@ export const sales = pgTable("sales", {
 // Insert schemas
 export const insertCustomerSchema = createInsertSchema(customers).omit({
   id: true,
+}).extend({
+  phone: z.string().optional(),
+  address: z.string().optional(),
 });
 
 export const insertProductSchema = createInsertSchema(products).omit({
