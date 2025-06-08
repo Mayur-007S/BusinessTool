@@ -13,7 +13,6 @@ import jakarta.validation.Valid;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/sales")
@@ -25,17 +24,14 @@ public class SaleController {
 
     @GetMapping
     public ResponseEntity<List<SaleWithDetailsDTO>> getAllSales() {
-        List<Sale> sales = saleService.getAllSales();
-        List<SaleWithDetailsDTO> salesWithDetails = sales.stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
-        return ResponseEntity.ok(salesWithDetails);
+        List<SaleWithDetailsDTO> sales = saleService.getAllSalesWithDetails();
+        return ResponseEntity.ok(sales);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<SaleWithDetailsDTO> getSaleById(@PathVariable Long id) {
-        Optional<Sale> sale = saleService.getSaleById(id);
-        return sale.map(s -> ResponseEntity.ok(convertToDTO(s)))
+        Optional<SaleWithDetailsDTO> sale = saleService.getSaleWithDetailsById(id);
+        return sale.map(ResponseEntity::ok)
                   .orElse(ResponseEntity.notFound().build());
     }
 
@@ -44,8 +40,8 @@ public class SaleController {
         try {
             Sale createdSale = saleService.createSale(sale);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdSale);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
     }
 
@@ -64,41 +60,19 @@ public class SaleController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
         
-        List<Sale> sales = saleService.getSalesByDateRange(startDate, endDate);
-        List<SaleWithDetailsDTO> salesWithDetails = sales.stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
-        return ResponseEntity.ok(salesWithDetails);
+        List<SaleWithDetailsDTO> sales = saleService.getSalesByDateRange(startDate, endDate);
+        return ResponseEntity.ok(sales);
     }
 
     @GetMapping("/customer/{customerId}")
     public ResponseEntity<List<SaleWithDetailsDTO>> getSalesByCustomer(@PathVariable Long customerId) {
-        List<Sale> sales = saleService.getSalesByCustomer(customerId);
-        List<SaleWithDetailsDTO> salesWithDetails = sales.stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
-        return ResponseEntity.ok(salesWithDetails);
+        List<SaleWithDetailsDTO> sales = saleService.getSalesByCustomer(customerId);
+        return ResponseEntity.ok(sales);
     }
 
     @GetMapping("/product/{productId}")
     public ResponseEntity<List<SaleWithDetailsDTO>> getSalesByProduct(@PathVariable Long productId) {
-        List<Sale> sales = saleService.getSalesByProduct(productId);
-        List<SaleWithDetailsDTO> salesWithDetails = sales.stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
-        return ResponseEntity.ok(salesWithDetails);
-    }
-
-    private SaleWithDetailsDTO convertToDTO(Sale sale) {
-        return new SaleWithDetailsDTO(
-            sale.getId(),
-            sale.getProduct().getId(),
-            sale.getProduct().getName(),
-            sale.getCustomer().getId(),
-            sale.getCustomer().getName(),
-            sale.getQuantity(),
-            sale.getTotalAmount(),
-            sale.getSaleDate()
-        );
+        List<SaleWithDetailsDTO> sales = saleService.getSalesByProduct(productId);
+        return ResponseEntity.ok(sales);
     }
 }

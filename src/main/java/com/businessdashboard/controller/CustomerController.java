@@ -37,19 +37,20 @@ public class CustomerController {
         try {
             Customer createdCustomer = customerService.createCustomer(customer);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdCustomer);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Customer> updateCustomer(@PathVariable Long id, 
-                                                  @Valid @RequestBody Customer customerDetails) {
+    public ResponseEntity<Customer> updateCustomer(@PathVariable Long id, @Valid @RequestBody Customer customerDetails) {
         try {
             Customer updatedCustomer = customerService.updateCustomer(id, customerDetails);
             return ResponseEntity.ok(updatedCustomer);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
     }
 
@@ -64,15 +65,11 @@ public class CustomerController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<List<Customer>> searchCustomers(@RequestParam String name) {
-        List<Customer> customers = customerService.searchCustomers(name);
-        return ResponseEntity.ok(customers);
-    }
-
-    @GetMapping("/email/{email}")
-    public ResponseEntity<Customer> getCustomerByEmail(@PathVariable String email) {
+    public ResponseEntity<List<Customer>> searchCustomers(@RequestParam String email) {
         Optional<Customer> customer = customerService.findByEmail(email);
-        return customer.map(ResponseEntity::ok)
-                      .orElse(ResponseEntity.notFound().build());
+        if (customer.isPresent()) {
+            return ResponseEntity.ok(List.of(customer.get()));
+        }
+        return ResponseEntity.ok(List.of());
     }
 }
