@@ -15,13 +15,29 @@ import { Plus, FileDown, BarChart3, UserPlus } from "lucide-react";
 import AddSaleDialog from "@/components/modals/AddSaleDialog";
 import AddCustomerDialog from "@/components/modals/AddCustomerDialog";
 import type { SaleWithDetails } from "@shared/schema";
+import type { DateRange } from "./DateRangeFilter";
+import { getDateRangeFilter } from "./DateRangeFilter";
 
-export default function RecentActivity() {
+interface RecentActivityProps {
+  dateRange: DateRange;
+}
+
+export default function RecentActivity({ dateRange }: RecentActivityProps) {
   const [showAddSaleDialog, setShowAddSaleDialog] = useState(false);
   const [showAddCustomerDialog, setShowAddCustomerDialog] = useState(false);
+  const { start, end } = getDateRangeFilter(dateRange);
 
   const { data: sales, isLoading } = useQuery<SaleWithDetails[]>({
-    queryKey: ["/api/sales"],
+    queryKey: ["/api/sales/date-range", dateRange],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        start: start.toISOString(),
+        end: end.toISOString()
+      });
+      const response = await fetch(`/api/sales/date-range?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch sales');
+      return response.json();
+    },
   });
 
   const recentSales = sales?.slice(0, 5) || [];

@@ -8,6 +8,8 @@ import {
   Package 
 } from "lucide-react";
 import type { DashboardStats } from "@shared/schema";
+import type { DateRange } from "./DateRangeFilter";
+import { getDateRangeFilter } from "./DateRangeFilter";
 
 const statIcons = {
   revenue: DollarSign,
@@ -23,9 +25,24 @@ const statColors = {
   inventory: "bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400",
 };
 
-export default function StatsGrid() {
+interface StatsGridProps {
+  dateRange: DateRange;
+}
+
+export default function StatsGrid({ dateRange }: StatsGridProps) {
+  const { start, end } = getDateRangeFilter(dateRange);
+  
   const { data: stats, isLoading } = useQuery<DashboardStats>({
-    queryKey: ["/api/dashboard/stats"],
+    queryKey: ["/api/dashboard/stats", dateRange],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        start: start.toISOString(),
+        end: end.toISOString()
+      });
+      const response = await fetch(`/api/dashboard/stats?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch stats');
+      return response.json();
+    },
   });
 
   if (isLoading) {

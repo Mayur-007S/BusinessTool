@@ -34,7 +34,8 @@ export interface IStorage {
   deleteSale(id: number): Promise<boolean>;
 
   // Dashboard
-  getDashboardStats(): Promise<DashboardStats>;
+  getDashboardStats(dateRange?: { start: Date; end: Date }): Promise<DashboardStats>;
+  getSalesInDateRange(dateRange: { start: Date; end: Date }): Promise<SaleWithDetails[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -208,8 +209,16 @@ export class MemStorage implements IStorage {
   }
 
   // Dashboard methods
-  async getDashboardStats(): Promise<DashboardStats> {
-    const salesArray = Array.from(this.sales.values());
+  async getDashboardStats(dateRange?: { start: Date; end: Date }): Promise<DashboardStats> {
+    let salesArray = Array.from(this.sales.values());
+    
+    if (dateRange) {
+      salesArray = salesArray.filter(sale => {
+        const saleDate = new Date(sale.date);
+        return saleDate >= dateRange.start && saleDate <= dateRange.end;
+      });
+    }
+    
     const totalRevenue = salesArray.reduce((sum, sale) => sum + parseFloat(sale.total), 0);
     
     return {
@@ -218,6 +227,24 @@ export class MemStorage implements IStorage {
       salesThisMonth: salesArray.length,
       inventoryItems: Array.from(this.products.values()).reduce((sum, product) => sum + product.stock, 0)
     };
+  }
+
+  async getSalesInDateRange(dateRange: { start: Date; end: Date }): Promise<SaleWithDetails[]> {
+    const salesArray = Array.from(this.sales.values());
+    const filteredSales = salesArray.filter(sale => {
+      const saleDate = new Date(sale.date);
+      return saleDate >= dateRange.start && saleDate <= dateRange.end;
+    });
+
+    return filteredSales.map(sale => {
+      const product = this.products.get(sale.productId);
+      const customer = this.customers.get(sale.customerId);
+      return {
+        ...sale,
+        productName: product?.name || "Unknown Product",
+        customerName: customer?.name || "Unknown Customer"
+      };
+    });
   }
 }
 

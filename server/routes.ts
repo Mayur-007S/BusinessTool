@@ -5,12 +5,37 @@ import { insertCustomerSchema, insertProductSchema, insertSaleSchema } from "@sh
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard routes
-  app.get("/api/dashboard/stats", async (_req, res) => {
+  app.get("/api/dashboard/stats", async (req, res) => {
     try {
-      const stats = await storage.getDashboardStats();
+      let dateRange;
+      if (req.query.start && req.query.end) {
+        dateRange = {
+          start: new Date(req.query.start as string),
+          end: new Date(req.query.end as string)
+        };
+      }
+      const stats = await storage.getDashboardStats(dateRange);
       res.json(stats);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  app.get("/api/sales/date-range", async (req, res) => {
+    try {
+      if (!req.query.start || !req.query.end) {
+        return res.status(400).json({ message: "Start and end dates are required" });
+      }
+      
+      const dateRange = {
+        start: new Date(req.query.start as string),
+        end: new Date(req.query.end as string)
+      };
+      
+      const sales = await storage.getSalesInDateRange(dateRange);
+      res.json(sales);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch sales in date range" });
     }
   });
 
