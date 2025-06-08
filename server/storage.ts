@@ -616,36 +616,32 @@ export class SQLiteStorage implements IStorage {
 
   private seedInitialData() {
     try {
-      // Check if data already exists
-      const existingCustomers = this.db.select().from(customers).limit(1).all();
-      if (existingCustomers.length > 0) return;
-
-      // Insert sample customers using raw SQL to avoid Drizzle issues
       const sqlite = this.db.$client;
       
+      // Check if data already exists
+      const existingCustomers = sqlite.prepare('SELECT COUNT(*) as count FROM customers').get();
+      if (existingCustomers.count > 0) return;
+
+      // Insert sample data using raw SQL
       sqlite.exec(`
         INSERT INTO customers (name, email, phone, address) VALUES
         ('John Smith', 'john@example.com', '(555) 123-4567', '123 Main St, Anytown, USA'),
         ('Sarah Johnson', 'sarah@example.com', '(555) 987-6543', '456 Oak Ave, Somewhere, USA'),
-        ('Mike Wilson', 'mike@example.com', '(555) 555-0123', '789 Pine Rd, Elsewhere, USA')
-      `);
-
-      sqlite.exec(`
+        ('Mike Wilson', 'mike@example.com', '(555) 555-0123', '789 Pine Rd, Elsewhere, USA');
+        
         INSERT INTO products (name, category, price, stock, status) VALUES
         ('Premium Software License', 'Software', 299.99, 50, 'In Stock'),
         ('Professional Consultation', 'Services', 150.00, 100, 'Available'),
         ('Hardware Kit', 'Hardware', 89.95, 25, 'In Stock'),
-        ('Training Package', 'Education', 199.99, 30, 'Available')
-      `);
-
-      sqlite.exec(`
+        ('Training Package', 'Education', 199.99, 30, 'Available');
+        
         INSERT INTO sales (product_id, customer_id, quantity, price, total) VALUES
         (1, 1, 2, 299.99, 599.98),
         (2, 2, 1, 150.00, 150.00),
         (3, 3, 3, 89.95, 269.85),
         (4, 1, 1, 199.99, 199.99),
         (1, 2, 1, 299.99, 299.99),
-        (2, 3, 2, 150.00, 300.00)
+        (2, 3, 2, 150.00, 300.00);
       `);
 
       console.log("✅ Sample data inserted into SQLite database");
