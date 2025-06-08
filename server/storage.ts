@@ -12,8 +12,10 @@ import {
   type DashboardStats
 } from "@shared/schema";
 import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle as drizzleSQLite } from "drizzle-orm/better-sqlite3";
 import { eq, gte, lte, sql } from "drizzle-orm";
 import mysql from "mysql2/promise";
+import Database from "better-sqlite3";
 
 export interface IStorage {
   // Customers
