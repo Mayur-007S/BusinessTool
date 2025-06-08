@@ -1,13 +1,13 @@
-# Business Dashboard - Spring/Hibernate Backend Integration
+# Business Dashboard - Spring/Hibernate Backend with MySQL Integration
 
-This project now includes a complete Java Spring/Hibernate backend alongside the existing Node.js frontend. Both systems can run independently or together.
+This project now includes a complete Java Spring/Hibernate backend with MySQL database integration alongside the existing Node.js frontend. Both systems can run independently or together.
 
 ## Architecture Overview
 
 ### Current Setup
 - **Frontend**: React with Vite (runs on port 5000)
 - **Node.js Backend**: Express.js with in-memory storage (integrated with frontend)
-- **Java Backend**: Spring Framework + Hibernate ORM + PostgreSQL (runs on port 8080)
+- **Java Backend**: Spring Framework + Hibernate ORM + MySQL Database (runs on port 8080)
 
 ## Java Spring/Hibernate Components
 
@@ -135,12 +135,19 @@ The Java backend uses environment variables for database connection:
 - Customer relationship management
 - Sales reporting with date ranges
 
-## Database Schema
+## MySQL Database Schema
 
-The Hibernate entities automatically create these tables:
-- `customers` - Customer information
-- `products` - Product catalog with inventory
-- `sales` - Sales transactions with foreign keys
+The Hibernate entities automatically create these tables in the `businessanaysisdb` database:
+- `customers` - Customer information (id, name, email, phone, address, timestamps)
+- `products` - Product catalog with inventory (id, name, description, price, category, stock_quantity, timestamps)
+- `sales` - Sales transactions with foreign keys (id, product_id, customer_id, quantity, unit_price, total_amount, sale_date)
+
+### Database Configuration
+- **Database URL**: `jdbc:mysql://localhost:3306/businessanaysisdb`
+- **JDBC Driver**: MySQL Connector/J 8.0.33
+- **Hibernate Dialect**: MySQL8Dialect
+- **Connection Pool**: HikariCP with optimized settings
+- **Character Encoding**: UTF-8 (utf8mb4)
 
 ## Development Workflow
 
