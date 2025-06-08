@@ -14,8 +14,10 @@ public class Application {
         try {
             System.out.println("Starting Business Dashboard Backend with MySQL...");
             
-            // Create Spring application context
-            AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+            // Create Spring web application context
+            AnnotationConfigWebApplicationContext context = new AnnotationConfigWebApplicationContext();
+            context.register(AppConfig.class);
+            context.refresh();
             
             // Create Jetty server
             Server server = new Server(8080);
