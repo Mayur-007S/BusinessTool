@@ -96,6 +96,14 @@ public class SaleDAO {
         return query.getSingleResult();
     }
 
+    public BigDecimal getTotalRevenueBetweenDates(LocalDateTime startDate, LocalDateTime endDate) {
+        return getTotalRevenueByDateRange(startDate, endDate);
+    }
+
+    public long countSalesBetweenDates(LocalDateTime startDate, LocalDateTime endDate) {
+        return countByDateRange(startDate, endDate);
+    }
+
     public long count() {
         Session session = sessionFactory.getCurrentSession();
         Query<Long> query = session.createQuery("SELECT COUNT(s) FROM Sale s", Long.class);
