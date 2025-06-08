@@ -547,5 +547,289 @@ export class MySQLStorage implements IStorage {
   }
 }
 
-// Choose storage implementation based on environment
-export const storage = process.env.USE_MYSQL === 'true' ? new MySQLStorage() : new MemStorage();
+// SQLite Storage Implementation
+export class SQLiteStorage implements IStorage {
+  private db: any;
+
+  constructor() {
+    this.initializeDatabase();
+  }
+
+  private initializeDatabase() {
+    try {
+      const sqlite = new Database('businessanalysis.db');
+      this.db = drizzleSQLite(sqlite);
+      
+      this.createTables();
+      this.seedInitialData();
+      
+      console.log("✅ SQLite database connected and initialized");
+    } catch (error) {
+      console.error("❌ SQLite initialization failed:", error);
+    }
+  }
+
+  private createTables() {
+    try {
+      const sqlite = this.db.$client;
+      
+      sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS customers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL UNIQUE,
+          phone TEXT,
+          address TEXT
+        )
+      `);
+
+      sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS products (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          category TEXT NOT NULL,
+          price REAL NOT NULL,
+          stock INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'In Stock'
+        )
+      `);
+
+      sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS sales (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL,
+          customer_id INTEGER NOT NULL,
+          quantity INTEGER NOT NULL,
+          price REAL NOT NULL,
+          total REAL NOT NULL,
+          date DATETIME DEFAULT (datetime('now')),
+          FOREIGN KEY (product_id) REFERENCES products(id),
+          FOREIGN KEY (customer_id) REFERENCES customers(id)
+        )
+      `);
+      
+      console.log("✅ SQLite tables created successfully");
+    } catch (error) {
+      console.error("Error creating SQLite tables:", error);
+    }
+  }
+
+  private seedInitialData() {
+    try {
+      // Check if data already exists
+      const existingCustomers = this.db.select().from(customers).limit(1).all();
+      if (existingCustomers.length > 0) return;
+
+      // Insert sample customers using raw SQL to avoid Drizzle issues
+      const sqlite = this.db.$client;
+      
+      sqlite.exec(`
+        INSERT INTO customers (name, email, phone, address) VALUES
+        ('John Smith', 'john@example.com', '(555) 123-4567', '123 Main St, Anytown, USA'),
+        ('Sarah Johnson', 'sarah@example.com', '(555) 987-6543', '456 Oak Ave, Somewhere, USA'),
+        ('Mike Wilson', 'mike@example.com', '(555) 555-0123', '789 Pine Rd, Elsewhere, USA')
+      `);
+
+      sqlite.exec(`
+        INSERT INTO products (name, category, price, stock, status) VALUES
+        ('Premium Software License', 'Software', 299.99, 50, 'In Stock'),
+        ('Professional Consultation', 'Services', 150.00, 100, 'Available'),
+        ('Hardware Kit', 'Hardware', 89.95, 25, 'In Stock'),
+        ('Training Package', 'Education', 199.99, 30, 'Available')
+      `);
+
+      sqlite.exec(`
+        INSERT INTO sales (product_id, customer_id, quantity, price, total) VALUES
+        (1, 1, 2, 299.99, 599.98),
+        (2, 2, 1, 150.00, 150.00),
+        (3, 3, 3, 89.95, 269.85),
+        (4, 1, 1, 199.99, 199.99),
+        (1, 2, 1, 299.99, 299.99),
+        (2, 3, 2, 150.00, 300.00)
+      `);
+
+      console.log("✅ Sample data inserted into SQLite database");
+    } catch (error) {
+      console.error("Error seeding SQLite data:", error);
+    }
+  }
+
+  // Customer methods
+  async getCustomers(): Promise<Customer[]> {
+    return this.db.select().from(customers).all();
+  }
+
+  async getCustomer(id: number): Promise<Customer | undefined> {
+    const result = this.db.select().from(customers).where(eq(customers.id, id)).get();
+    return result;
+  }
+
+  async createCustomer(customer: InsertCustomer): Promise<Customer> {
+    const result = this.db.insert(customers).values(customer).run();
+    const newCustomer = await this.getCustomer(result.lastInsertRowid as number);
+    return newCustomer!;
+  }
+
+  async updateCustomer(id: number, customer: Partial<InsertCustomer>): Promise<Customer | undefined> {
+    this.db.update(customers).set(customer).where(eq(customers.id, id)).run();
+    return await this.getCustomer(id);
+  }
+
+  async deleteCustomer(id: number): Promise<boolean> {
+    const result = this.db.delete(customers).where(eq(customers.id, id)).run();
+    return result.changes > 0;
+  }
+
+  // Product methods
+  async getProducts(): Promise<Product[]> {
+    return this.db.select().from(products).all();
+  }
+
+  async getProduct(id: number): Promise<Product | undefined> {
+    return this.db.select().from(products).where(eq(products.id, id)).get();
+  }
+
+  async createProduct(product: InsertProduct): Promise<Product> {
+    const result = this.db.insert(products).values(product).run();
+    const newProduct = await this.getProduct(result.lastInsertRowid as number);
+    return newProduct!;
+  }
+
+  async updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined> {
+    this.db.update(products).set(product).where(eq(products.id, id)).run();
+    return await this.getProduct(id);
+  }
+
+  async deleteProduct(id: number): Promise<boolean> {
+    const result = this.db.delete(products).where(eq(products.id, id)).run();
+    return result.changes > 0;
+  }
+
+  // Sales methods
+  async getSales(): Promise<SaleWithDetails[]> {
+    const result = this.db
+      .select({
+        id: sales.id,
+        productId: sales.productId,
+        customerId: sales.customerId,
+        quantity: sales.quantity,
+        price: sales.price,
+        total: sales.total,
+        date: sales.date,
+        productName: products.name,
+        customerName: customers.name,
+      })
+      .from(sales)
+      .leftJoin(products, eq(sales.productId, products.id))
+      .leftJoin(customers, eq(sales.customerId, customers.id))
+      .all();
+    
+    return result;
+  }
+
+  async getSale(id: number): Promise<SaleWithDetails | undefined> {
+    const result = this.db
+      .select({
+        id: sales.id,
+        productId: sales.productId,
+        customerId: sales.customerId,
+        quantity: sales.quantity,
+        price: sales.price,
+        total: sales.total,
+        date: sales.date,
+        productName: products.name,
+        customerName: customers.name,
+      })
+      .from(sales)
+      .leftJoin(products, eq(sales.productId, products.id))
+      .leftJoin(customers, eq(sales.customerId, customers.id))
+      .where(eq(sales.id, id))
+      .get();
+    
+    return result;
+  }
+
+  async createSale(sale: InsertSale): Promise<Sale> {
+    const result = this.db.insert(sales).values(sale).run();
+    const newSale = this.db.select().from(sales).where(eq(sales.id, result.lastInsertRowid as number)).get();
+    return newSale;
+  }
+
+  async deleteSale(id: number): Promise<boolean> {
+    const result = this.db.delete(sales).where(eq(sales.id, id)).run();
+    return result.changes > 0;
+  }
+
+  // Dashboard methods
+  async getDashboardStats(dateRange?: { start: Date; end: Date }): Promise<DashboardStats> {
+    let salesQuery = this.db.select().from(sales);
+    
+    if (dateRange) {
+      salesQuery = salesQuery.where(
+        sql`${sales.date} >= ${dateRange.start.toISOString()} AND ${sales.date} <= ${dateRange.end.toISOString()}`
+      );
+    }
+
+    const salesData = salesQuery.all();
+    const totalRevenue = salesData.reduce((sum: number, sale: any) => sum + parseFloat(sale.total), 0);
+    
+    const customersData = this.db.select().from(customers).all();
+    const productsData = this.db.select().from(products).all();
+    const inventoryItems = productsData.reduce((sum: number, product: any) => sum + product.stock, 0);
+
+    return {
+      totalRevenue: `$${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      activeCustomers: customersData.length,
+      salesThisMonth: salesData.length,
+      inventoryItems: inventoryItems
+    };
+  }
+
+  async getSalesInDateRange(dateRange: { start: Date; end: Date }): Promise<SaleWithDetails[]> {
+    const result = this.db
+      .select({
+        id: sales.id,
+        productId: sales.productId,
+        customerId: sales.customerId,
+        quantity: sales.quantity,
+        price: sales.price,
+        total: sales.total,
+        date: sales.date,
+        productName: products.name,
+        customerName: customers.name,
+      })
+      .from(sales)
+      .leftJoin(products, eq(sales.productId, products.id))
+      .leftJoin(customers, eq(sales.customerId, customers.id))
+      .where(
+        sql`${sales.date} >= ${dateRange.start.toISOString()} AND ${sales.date} <= ${dateRange.end.toISOString()}`
+      )
+      .all();
+    
+    return result;
+  }
+}
+
+// Database factory to choose the best available storage
+function createStorage(): IStorage {
+  // Try MySQL first if configured
+  if (process.env.USE_MYSQL === 'true') {
+    try {
+      console.log("Attempting MySQL connection...");
+      return new MySQLStorage();
+    } catch (error) {
+      console.log("MySQL not available, falling back to SQLite");
+    }
+  }
+  
+  // Fall back to SQLite
+  try {
+    console.log("Using SQLite database...");
+    return new SQLiteStorage();
+  } catch (error) {
+    console.log("SQLite not available, using in-memory storage");
+    return new MemStorage();
+  }
+}
+
+export const storage = createStorage();
