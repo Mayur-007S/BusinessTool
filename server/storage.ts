@@ -1006,14 +1006,9 @@ export class SQLiteStorage implements IStorage {
 
 // Database factory to choose the best available storage
 function createStorage(): IStorage {
-  // Use DatabaseStorage for authenticated applications
-  try {
-    console.log("Using MySQL DatabaseStorage with authentication...");
-    return new DatabaseStorage();
-  } catch (error) {
-    console.log("Database not available, using in-memory storage");
-    return new MemStorage();
-  }
+  // Use in-memory storage for development
+  console.log("Using in-memory storage with authentication...");
+  return new MemStorage();
 }
 
 export const storage = createStorage();
