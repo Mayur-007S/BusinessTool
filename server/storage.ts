@@ -283,6 +283,174 @@ export class MemStorage implements IStorage {
   }
 }
 
+// Database Storage Implementation (MySQL with Drizzle)
+export class DatabaseStorage implements IStorage {
+  private db = db;
+
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await this.db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await this.db
+      .insert(users)
+      .values({
+        id: userData.id,
+        email: userData.email || null,
+        firstName: userData.firstName || null,
+        lastName: userData.lastName || null,
+        profileImageUrl: userData.profileImageUrl || null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onDuplicateKeyUpdate({
+        set: {
+          email: userData.email || null,
+          firstName: userData.firstName || null,
+          lastName: userData.lastName || null,
+          profileImageUrl: userData.profileImageUrl || null,
+          updatedAt: new Date(),
+        },
+      })
+      .execute();
+    
+    return this.getUser(userData.id) as Promise<User>;
+  }
+
+  async getCustomers(): Promise<Customer[]> {
+    return await this.db.select().from(customers);
+  }
+
+  async getCustomer(id: number): Promise<Customer | undefined> {
+    const [customer] = await this.db.select().from(customers).where(eq(customers.id, id));
+    return customer || undefined;
+  }
+
+  async createCustomer(customer: InsertCustomer): Promise<Customer> {
+    const [newCustomer] = await this.db.insert(customers).values(customer).execute();
+    return this.getCustomer(newCustomer.insertId) as Promise<Customer>;
+  }
+
+  async updateCustomer(id: number, customer: Partial<InsertCustomer>): Promise<Customer | undefined> {
+    await this.db.update(customers).set(customer).where(eq(customers.id, id));
+    return this.getCustomer(id);
+  }
+
+  async deleteCustomer(id: number): Promise<boolean> {
+    const result = await this.db.delete(customers).where(eq(customers.id, id));
+    return result.affectedRows > 0;
+  }
+
+  async getProducts(): Promise<Product[]> {
+    return await this.db.select().from(products);
+  }
+
+  async getProduct(id: number): Promise<Product | undefined> {
+    const [product] = await this.db.select().from(products).where(eq(products.id, id));
+    return product || undefined;
+  }
+
+  async createProduct(product: InsertProduct): Promise<Product> {
+    const [newProduct] = await this.db.insert(products).values(product).execute();
+    return this.getProduct(newProduct.insertId) as Promise<Product>;
+  }
+
+  async updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined> {
+    await this.db.update(products).set(product).where(eq(products.id, id));
+    return this.getProduct(id);
+  }
+
+  async deleteProduct(id: number): Promise<boolean> {
+    const result = await this.db.delete(products).where(eq(products.id, id));
+    return result.affectedRows > 0;
+  }
+
+  async getSales(): Promise<SaleWithDetails[]> {
+    const salesList = await this.db.select().from(sales);
+    const salesWithDetails = await Promise.all(
+      salesList.map(async (sale) => {
+        const product = await this.getProduct(sale.productId);
+        const customer = await this.getCustomer(sale.customerId);
+        return {
+          ...sale,
+          productName: product?.name || "Unknown Product",
+          customerName: customer?.name || "Unknown Customer"
+        };
+      })
+    );
+    return salesWithDetails;
+  }
+
+  async getSale(id: number): Promise<SaleWithDetails | undefined> {
+    const [sale] = await this.db.select().from(sales).where(eq(sales.id, id));
+    if (!sale) return undefined;
+
+    const product = await this.getProduct(sale.productId);
+    const customer = await this.getCustomer(sale.customerId);
+    
+    return {
+      ...sale,
+      productName: product?.name || "Unknown Product",
+      customerName: customer?.name || "Unknown Customer"
+    };
+  }
+
+  async createSale(sale: InsertSale): Promise<Sale> {
+    const [newSale] = await this.db.insert(sales).values(sale).execute();
+    const [createdSale] = await this.db.select().from(sales).where(eq(sales.id, newSale.insertId));
+    return createdSale;
+  }
+
+  async deleteSale(id: number): Promise<boolean> {
+    const result = await this.db.delete(sales).where(eq(sales.id, id));
+    return result.affectedRows > 0;
+  }
+
+  async getDashboardStats(dateRange?: { start: Date; end: Date }): Promise<DashboardStats> {
+    let salesQuery = this.db.select().from(sales);
+    
+    if (dateRange) {
+      salesQuery = salesQuery.where(
+        sql`${sales.date} >= ${dateRange.start} AND ${sales.date} <= ${dateRange.end}`
+      );
+    }
+
+    const salesList = await salesQuery;
+    const totalRevenue = salesList.reduce((sum, sale) => sum + parseFloat(sale.total.toString()), 0);
+    
+    const customersList = await this.db.select().from(customers);
+    const productsList = await this.db.select().from(products);
+
+    return {
+      totalRevenue: `$${totalRevenue.toLocaleString()}`,
+      activeCustomers: customersList.length,
+      salesThisMonth: salesList.length,
+      inventoryItems: productsList.length,
+    };
+  }
+
+  async getSalesInDateRange(dateRange: { start: Date; end: Date }): Promise<SaleWithDetails[]> {
+    const salesList = await this.db.select().from(sales).where(
+      sql`${sales.date} >= ${dateRange.start} AND ${sales.date} <= ${dateRange.end}`
+    );
+
+    const salesWithDetails = await Promise.all(
+      salesList.map(async (sale) => {
+        const product = await this.getProduct(sale.productId);
+        const customer = await this.getCustomer(sale.customerId);
+        return {
+          ...sale,
+          productName: product?.name || "Unknown Product",
+          customerName: customer?.name || "Unknown Customer"
+        };
+      })
+    );
+    
+    return salesWithDetails;
+  }
+}
+
 // MySQL Storage Implementation
 export class MySQLStorage implements IStorage {
   private db: any;
@@ -838,22 +1006,12 @@ export class SQLiteStorage implements IStorage {
 
 // Database factory to choose the best available storage
 function createStorage(): IStorage {
-  // Try MySQL first if configured
-  if (process.env.USE_MYSQL === 'true') {
-    try {
-      console.log("Attempting MySQL connection...");
-      return new MySQLStorage();
-    } catch (error) {
-      console.log("MySQL not available, falling back to SQLite");
-    }
-  }
-  
-  // Fall back to SQLite
+  // Use DatabaseStorage for authenticated applications
   try {
-    console.log("Using SQLite database...");
-    return new SQLiteStorage();
+    console.log("Using MySQL DatabaseStorage with authentication...");
+    return new DatabaseStorage();
   } catch (error) {
-    console.log("SQLite not available, using in-memory storage");
+    console.log("Database not available, using in-memory storage");
     return new MemStorage();
   }
 }
