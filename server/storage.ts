@@ -1,7 +1,8 @@
 import { 
   customers, 
   products, 
-  sales, 
+  sales,
+  users,
   type Customer, 
   type InsertCustomer,
   type Product,
@@ -9,7 +10,9 @@ import {
   type Sale,
   type InsertSale,
   type SaleWithDetails,
-  type DashboardStats
+  type DashboardStats,
+  type User,
+  type UpsertUser
 } from "@shared/schema";
 import { drizzle } from "drizzle-orm/mysql2";
 import { drizzle as drizzleSQLite } from "drizzle-orm/better-sqlite3";

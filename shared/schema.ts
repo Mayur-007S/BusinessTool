@@ -1,6 +1,28 @@
-import { mysqlTable, varchar, int, decimal, timestamp } from "drizzle-orm/mysql-core";
+import { mysqlTable, varchar, int, decimal, timestamp, json, index } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Session storage table for Replit Auth
+export const sessions = mysqlTable(
+  "sessions",
+  {
+    sid: varchar("sid", { length: 255 }).primaryKey(),
+    sess: json("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// User storage table for Replit Auth
+export const users = mysqlTable("users", {
+  id: varchar("id", { length: 255 }).primaryKey().notNull(),
+  email: varchar("email", { length: 255 }).unique(),
+  firstName: varchar("first_name", { length: 255 }),
+  lastName: varchar("last_name", { length: 255 }),
+  profileImageUrl: varchar("profile_image_url", { length: 500 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 
 export const customers = mysqlTable("customers", {
   id: int("id").primaryKey().autoincrement(),
@@ -45,6 +67,10 @@ export const insertSaleSchema = createInsertSchema(sales).omit({
   id: true,
   date: true,
 });
+
+// User types for Replit Auth
+export type UpsertUser = typeof users.$inferInsert;
+export type User = typeof users.$inferSelect;
 
 // Types
 export type Customer = typeof customers.$inferSelect;
